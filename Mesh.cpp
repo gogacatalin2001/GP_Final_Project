@@ -18,20 +18,28 @@ namespace gps {
 	/* Mesh drawing function - also applies associated textures */
 	void Mesh::Draw(gps::Shader shader)
 	{
+		// set the shader program to use
 		shader.useShaderProgram();
 
-		//set textures
+		// set textures
 		for (GLuint i = 0; i < textures.size(); i++)
 		{
 			glActiveTexture(GL_TEXTURE0 + i);
+			// send the textures to the shader program
 			glUniform1i(glGetUniformLocation(shader.shaderProgram, this->textures[i].type.c_str()), i);
+			// bind the textures
 			glBindTexture(GL_TEXTURE_2D, this->textures[i].id);
 		}
 
+		// bind the VAO
 		glBindVertexArray(this->buffers.VAO);
+		// draw the textures
 		glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
+
+		// unbind the buffers
 		glBindVertexArray(0);
 
+		// unbind the textures
         for(GLuint i = 0; i < this->textures.size(); i++)
         {
             glActiveTexture(GL_TEXTURE0 + i);
@@ -47,25 +55,28 @@ namespace gps {
 		glGenBuffers(1, &this->buffers.VBO);
 		glGenBuffers(1, &this->buffers.EBO);
 
-		glBindVertexArray(this->buffers.VAO);
 		// Load data into vertex buffers
+		// VAO
+		glBindVertexArray(this->buffers.VAO);
+		// VBO
 		glBindBuffer(GL_ARRAY_BUFFER, this->buffers.VBO);
 		glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), &this->vertices[0], GL_STATIC_DRAW);
-
+		// EBO
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->buffers.EBO);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(GLuint), &this->indices[0], GL_STATIC_DRAW);
 
-		// Set the vertex attribute pointers
-		// Vertex Positions
+		// Set the vertex attributes
+		// Vertex Positions attribute
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0);
-		// Vertex Normals
+		// Vertex Normals attribute
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Normal));
-		// Vertex Texture Coords
+		// Vertex Texture Coords attribute
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, TexCoords));
 
+		// unbind the VAO
 		glBindVertexArray(0);
 	}
 }

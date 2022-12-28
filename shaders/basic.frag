@@ -1,23 +1,27 @@
 #version 410 core
 
+// Input from the vertex shader
 in vec3 fPosition;
 in vec3 fNormal;
 in vec2 fTexCoords;
 
+// Output to the CPU program
 out vec4 fColor;
 
-//matrices
+// Uniforms
+
+// matrices
 uniform mat4 model;
 uniform mat4 view;
 uniform mat3 normalMatrix;
-//lighting
+// lighting
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 // textures
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
 
-//components
+// components
 vec3 ambient;
 float ambientStrength = 0.2f;
 vec3 diffuse;
@@ -33,8 +37,8 @@ void computeDirLight()
     //normalize light direction
     vec3 lightDirN = vec3(normalize(view * vec4(lightDir, 0.0f)));
 
-    //compute view direction (in eye coordinates, the viewer is situated at the origin
-    vec3 viewDir = normalize(- fPosEye.xyz);
+    //compute view direction (in eye coordinates, the viewer is situated at the origin)
+     vec3 viewDir = normalize(- fPosEye.xyz);
 
     //compute ambient light
     ambient = ambientStrength * lightColor;
