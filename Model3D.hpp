@@ -12,11 +12,11 @@
 
 namespace gps {
 
-    class Model3D
-    {
+	class Model3D
+	{
 
-    public:
-        ~Model3D();
+	public:
+		~Model3D();
 
 		void LoadModel(std::string fileName);
 
@@ -24,11 +24,11 @@ namespace gps {
 
 		void Draw(gps::Shader shaderProgram);
 
-    private:
+	private:
 		// Component meshes - group of objects
-        std::vector<gps::Mesh> meshes;
+		std::vector<gps::Mesh> meshes;
 		// Associated textures
-        std::vector<gps::Texture> loadedTextures;
+		std::vector<gps::Texture> loadedTextures;
 
 		// Does the parsing of the .obj file and fills in the data structure
 		void ReadOBJ(std::string fileName, std::string basePath);
@@ -38,7 +38,7 @@ namespace gps {
 
 		// Reads the pixel data from an image file and loads it into the video memory
 		GLuint ReadTextureFromFile(const char* file_name);
-    };
+	};
 }
 
 #endif /* Model3D_hpp */

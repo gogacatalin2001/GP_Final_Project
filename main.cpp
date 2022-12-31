@@ -15,7 +15,7 @@
 #include <iostream>
 
 // window
-gps::Window window;
+gps::Window myWindow;
 int glWindowWidth = 800, glWindowHeight = 600;
 
 // matrices
@@ -45,8 +45,8 @@ gps::Camera myCamera(
 
 float pitch = 0.0f, yaw = 0.0f;
 GLfloat cameraSpeed = 0.1f;
-float nearPlane = 0.1f, farPlane = 1000.0f;
-float FOV = 45.0f;
+const float nearPlane = 0.1f, farPlane = 1000.0f;
+const float FOV = 45.0f;
 
 // models
 gps::Model3D teapot;
@@ -57,8 +57,8 @@ gps::Shader myBasicShader;
 
 // controls
 GLboolean pressedKeys[1024];
-bool mouse = true;
-double xLast, yLast;
+const float mouseSensitivity = 0.1f;
+double mouseLastX, mouseLastY;
 
 
 GLenum glCheckError_(const char* file, int line)
@@ -95,20 +95,20 @@ GLenum glCheckError_(const char* file, int line)
 }
 #define glCheckError() glCheckError_(__FILE__, __LINE__)
 
-void windowResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
+void windowResizeCallback(GLFWwindow* window, int width, int height) {
 	fprintf(stdout, "Window resized! New width: %d , and height: %d\n", width, height);
 	
 	// update the window dimensions for retina display
-	glfwGetFramebufferSize(window.getWindow(), &glWindowWidth, &glWindowHeight);
+	glfwGetFramebufferSize(window, &glWindowWidth, &glWindowHeight);
 	WindowDimensions windowDimensions = { glWindowWidth, glWindowHeight };
-	window.setWindowDimensions(windowDimensions);
+	myWindow.setWindowDimensions(windowDimensions);
 
 	// set the shader program
 	myBasicShader.useShaderProgram();
 
 	// update the projection
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f),
-		(float)window.getWindowDimensions().width / (float)window.getWindowDimensions().height,
+		(float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
 		nearPlane, farPlane);
 	GLint projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
 	// send projection matrix to shader
@@ -134,41 +134,37 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 	//TODO: implement mouse callback
+	
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		// hide the mouse cursor when rotating the camera
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+		
+		double mouseX, mouseY;
+		glfwGetCursorPos(window, &mouseX, &mouseY);
 
-	if (mouse)
-	{
-		xLast = xpos;
-		yLast = ypos;
-		mouse = false;
+		// float pitch = mouseSensitivity * (float)(xpos - (glWindowHeight / 2)) / glWindowHeight;
+		// float yaw = mouseSensitivity * (float)(ypos - (glWindowWidth / 2)) / glWindowWidth;
+
+		float yaw = mouseSensitivity * (float)(mouseX - mouseLastX);
+		float pitch = mouseSensitivity * (float)(mouseY - mouseLastY);
+
+		mouseLastX = mouseX;
+		mouseLastY = mouseY;
+		
+		myCamera.rotate(pitch, yaw);
+		// set the cursor back to the center of the screen
+		// glfwSetCursorPos(window, (double)(glWindowWidth / 2), (double)(glWindowHeight / 2));
 	}
-	// compute offset for current mouse position
-	double xOffset = xpos - xLast;
-	double yOffset = yLast - ypos;
-
-	// update current mouse coordinates
-	xLast = xpos;
-	yLast = ypos;
-
-	// add sensitivity to mouse offset
-	xOffset *= cameraSpeed;
-	yOffset *= cameraSpeed;
-
-	// update the camera pitch and yaw
-	yaw += xOffset;
-	pitch += yOffset;
-
-	if (pitch > 89.0f)
-		pitch = 89.0f;
-	if (pitch < -89.0f)
-		pitch = -89.0f;
-
-	myCamera.rotate(pitch, yaw);
+	else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+		// show the mouse cursor when stopped rotating the camera
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
 }
 
 void processMovement() {
 	if (pressedKeys[GLFW_KEY_W]) {
 		myCamera.move(gps::MOVE_FORWARD, cameraSpeed);
-		//update view matrix
+		// update view matrix
 		view = myCamera.getViewMatrix();
 		myBasicShader.useShaderProgram();
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
@@ -178,7 +174,7 @@ void processMovement() {
 
 	if (pressedKeys[GLFW_KEY_S]) {
 		myCamera.move(gps::MOVE_BACKWARD, cameraSpeed);
-		//update view matrix
+		// update view matrix
 		view = myCamera.getViewMatrix();
 		myBasicShader.useShaderProgram();
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
@@ -188,7 +184,7 @@ void processMovement() {
 
 	if (pressedKeys[GLFW_KEY_A]) {
 		myCamera.move(gps::MOVE_LEFT, cameraSpeed);
-		//update view matrix
+		// update view matrix
 		view = myCamera.getViewMatrix();
 		myBasicShader.useShaderProgram();
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
@@ -198,7 +194,7 @@ void processMovement() {
 
 	if (pressedKeys[GLFW_KEY_D]) {
 		myCamera.move(gps::MOVE_RIGHT, cameraSpeed);
-		//update view matrix
+		// update view matrix
 		view = myCamera.getViewMatrix();
 		myBasicShader.useShaderProgram();
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
@@ -208,6 +204,8 @@ void processMovement() {
 
 	if (pressedKeys[GLFW_KEY_Q]) {
 		angle -= 1.0f;
+		if (angle < 0.0f)
+			angle += 360.0f;
 		// update model matrix for teapot
 		model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
 		// update normal matrix for teapot
@@ -216,26 +214,64 @@ void processMovement() {
 
 	if (pressedKeys[GLFW_KEY_E]) {
 		angle += 1.0f;
+		if (angle > 360.0f)
+			angle -= 360.0f;
 		// update model matrix for teapot
 		model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
 		// update normal matrix for teapot
 		normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
 	}
+
+	if (pressedKeys[GLFW_KEY_LEFT_SHIFT]) {
+		myCamera.move(gps::MOVE_UP, cameraSpeed);
+		// update view matrix
+		view = myCamera.getViewMatrix();
+		myBasicShader.useShaderProgram();
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+		// compute normal matrix for teapot
+		normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
+	}
+
+	if (pressedKeys[GLFW_KEY_LEFT_CONTROL]) {
+		myCamera.move(gps::MOVE_DOWN, cameraSpeed);
+		// update view matrix
+		view = myCamera.getViewMatrix();
+		myBasicShader.useShaderProgram();
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+		// compute normal matrix for teapot
+		normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
+	}
+
+	// VIEWING MODE CONTROLS
+	// line view
+	if (pressedKeys[GLFW_KEY_1]) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+
+	// point view
+	if (pressedKeys[GLFW_KEY_2]) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+	}
+
+	// normal view
+	if (pressedKeys[GLFW_KEY_3]) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 }
 
 void initOpenGLWindow() {
-	window.Create(glWindowWidth, glWindowHeight, "OpenGL Project");
+	myWindow.Create(glWindowWidth, glWindowHeight, "OpenGL Project");
 }
 
 void setWindowCallbacks() {
-	glfwSetWindowSizeCallback(window.getWindow(), windowResizeCallback);
-	glfwSetKeyCallback(window.getWindow(), keyboardCallback);
-	glfwSetCursorPosCallback(window.getWindow(), mouseCallback);
+	glfwSetWindowSizeCallback(myWindow.getWindow(), windowResizeCallback);
+	glfwSetKeyCallback(myWindow.getWindow(), keyboardCallback);
+	glfwSetCursorPosCallback(myWindow.getWindow(), mouseCallback);
 }
 
 void initOpenGLState() {
 	glClearColor(0.7f, 0.7f, 0.7f, 1.0f);
-	glViewport(0, 0, window.getWindowDimensions().width, window.getWindowDimensions().height); // set the viewport
+	glViewport(0, 0, myWindow.getWindowDimensions().width, myWindow.getWindowDimensions().height); // set the viewport
 	glEnable(GL_FRAMEBUFFER_SRGB); // set the color range
 	glEnable(GL_DEPTH_TEST); // enable depth-testing
 	glDepthFunc(GL_LESS); // depth-testing interprets a smaller value as "closer"
@@ -273,7 +309,7 @@ void initUniforms() {
 
 	// create projection matrix
 	projection = glm::perspective(glm::radians(45.0f),
-		(float)window.getWindowDimensions().width / (float)window.getWindowDimensions().height,
+		(float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
 		nearPlane, farPlane);
 	projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
 	// send projection matrix to shader
@@ -317,7 +353,7 @@ void renderScene() {
 }
 
 void cleanup() {
-	window.Delete();
+	myWindow.Delete();
 	//cleanup code for your own data
 }
 
@@ -341,12 +377,12 @@ int main(int argc, const char* argv[]) {
 
 	glCheckError();
 	// application loop
-	while (!glfwWindowShouldClose(window.getWindow())) {
+	while (!glfwWindowShouldClose(myWindow.getWindow())) {
 		processMovement();
 		renderScene();
 
 		glfwPollEvents(); // wait for event
-		glfwSwapBuffers(window.getWindow()); // swap between front and back buffer
+		glfwSwapBuffers(myWindow.getWindow()); // swap between front and back buffer
 
 		glCheckError();
 	}

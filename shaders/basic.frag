@@ -8,15 +8,16 @@ in vec2 fTexCoords;
 // Output to the CPU program
 out vec4 fColor;
 
-// Uniforms
-
+// UNIFORMS
 // matrices
 uniform mat4 model;
 uniform mat4 view;
 uniform mat3 normalMatrix;
+
 // lighting
 uniform vec3 lightDir;
 uniform vec3 lightColor;
+
 // textures
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
