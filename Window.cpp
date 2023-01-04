@@ -27,6 +27,8 @@ namespace gps {
 
         // make the new winodw active
         glfwMakeContextCurrent(window);
+        glfwGetFramebufferSize(window, &this->dimensions.width, &this->dimensions.height);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         // set the time swapping time between front and back buffers
         glfwSwapInterval(1);
@@ -41,8 +43,7 @@ namespace gps {
         std::cout << "Renderer: " << renderer << std::endl;
         std::cout << "OpenGL version: " << version << std::endl;
 
-        //for RETINA display
-        glfwGetFramebufferSize(window, &this->dimensions.width, &this->dimensions.height);
+        
     }
 
     void Window::Delete() {
