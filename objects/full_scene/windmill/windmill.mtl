@@ -1,0 +1,12 @@
+# Blender 3.3.1 MTL File: 'low-poly-island-scene.blend'
+# www.blender.org
+
+newmtl ACUNIT
+Ns 114.638245
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 3
+map_Kd Windmill_Texture.png

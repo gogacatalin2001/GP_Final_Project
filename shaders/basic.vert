@@ -1,27 +1,31 @@
 #version 410 core
 
-// set the pointers to the vetrex attribute locations
 layout(location=0) in vec3 vPosition;
 layout(location=1) in vec3 vNormal;
 layout(location=2) in vec2 vTexCoords;
 
-// outputs to fragment shader
-out vec3 fPosition;
 out vec3 fNormal;
+out vec4 fPosEye;
 out vec2 fTexCoords;
+out vec4 fragPosLightSpace;
 
-// uniforms
-// Camera transformation matrices
+out vec3 fragPos;
+
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform	mat3 normalMatrix;
+uniform mat4 lightSpaceTrMatrix;
 
 void main() 
 {
-	// apply the transformations to the vertex position
-	gl_Position = projection * view * model * vec4(vPosition, 1.0f);
-	// send the vertex attributes to the fragment shader
-	fPosition = vPosition;
-	fNormal = vNormal;
+	//compute eye space coordinates
+	fPosEye = view * model * vec4(vPosition, 1.0f);
+	fNormal = normalize(normalMatrix * vNormal);
+
+	fragPos = vec3(model* vec4(vPosition,1.0f));
+
 	fTexCoords = vTexCoords;
+	fragPosLightSpace = lightSpaceTrMatrix * model * vec4(vPosition, 1.0f);
+	gl_Position = projection * view * model * vec4(vPosition, 1.0f);
 }

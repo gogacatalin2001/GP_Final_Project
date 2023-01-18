@@ -4,6 +4,7 @@ namespace gps {
 
 	// Camera constructor
 	Camera::Camera(glm::vec3 cameraPosition, glm::vec3 cameraTarget, glm::vec3 cameraUp) {
+		this->initialPosition = cameraPosition;
 		this->cameraPosition = cameraPosition;
 		this->cameraTarget = cameraTarget;
 		this->cameraFrontDirection = glm::normalize(cameraPosition - cameraTarget);
@@ -16,14 +17,25 @@ namespace gps {
 		return glm::lookAt(cameraPosition, cameraPosition + cameraFrontDirection, cameraUpDirection);
 	}
 
-	glm::vec3 Camera::getCameraTarget()
+	glm::vec3 Camera::getCameraFrontDirection()
 	{
-		return cameraTarget;
+		return this->cameraFrontDirection;
 	}
 
 	glm::vec3 Camera::getCameraPosition()
 	{
 		return cameraPosition;
+	}
+
+	void Camera::setCameraPosition(glm::vec3 position) {
+		this->cameraPosition = position;
+	}
+
+	void Camera::goToInitialPosition() {
+		this->cameraPosition = this->initialPosition;
+		this->cameraFrontDirection = glm::normalize(cameraPosition - cameraTarget);
+		this->cameraRightDirection = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), this->cameraFrontDirection));
+		this->cameraUpDirection = glm::normalize(glm::cross(this->cameraFrontDirection, this->cameraRightDirection));
 	}
 
 	// update the camera internal parameters following a camera move event
@@ -64,15 +76,6 @@ namespace gps {
 				//this->cameraTarget += glm::vec3(0.0f, -speed, 0.0f);
 				break;
 			}
-			/*case MOVE_ANIM: {
-				float camX = sin(glfwGetTime());
-				this->cameraPosition = glm::vec3(sin(speed), 0.5f, cos(speed));
-				this->cameraPosition *= 6;
-				this->cameraTarget = glm::vec3(0.0f);
-				this->cameraFrontDirection = cameraTarget - cameraPosition;
-				this->cameraRightDirection = glm::cross(this->cameraFrontDirection, this->cameraUpDirection);
-				break;
-			}*/
 		}
 	}
 
@@ -85,6 +88,19 @@ namespace gps {
 		viewDirection.y = sin(glm::radians(pitch));
 		viewDirection.z = cos(glm::radians(pitch)) * sin(glm::radians(yaw));
 		this->cameraFrontDirection = glm::normalize(viewDirection);
-		this->cameraRightDirection = glm::normalize(glm::cross(this->cameraFrontDirection, this->cameraUpDirection));
+	}
+
+	void Camera::preview(float angle) {
+		// set the camera position
+		this->cameraPosition = glm::vec3(-9.0, 4.0, 4.0);
+
+		// rotate with specific angle around Y axis
+		glm::mat4 r = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
+
+		// compute the new position of the camera 
+		// previous position * rotation matrix
+		this->cameraPosition = glm::vec4(r * glm::vec4(this->cameraPosition, 1));
+		this->cameraFrontDirection = glm::normalize(cameraTarget - cameraPosition);
+		cameraRightDirection = glm::normalize(glm::cross(cameraFrontDirection, glm::vec3(0.0f, 1.0f, 0.0f)));
 	}
 }

@@ -14,36 +14,97 @@
 #include "Camera.hpp"
 #include "Model3D.hpp"
 
-#include <iostream>
 
-// window
+// ####################
+//		WINDOW
+// ####################
+
 gps::Window myWindow;
 int screenWidth = 800, screenHeight = 600;
 
-// matrices
+// ####################
+//		MATRICES
+// ####################
+
 glm::mat4 model;
-glm::mat4 view;
-glm::mat4 projection;
-glm::mat3 normalMatrix;
-
-// light parameters
-glm::vec3 lightDir;
-glm::vec3 lightColor;
-
-// shader uniform locations
 GLint modelLoc;
+
+glm::mat4 view;
 GLint viewLoc;
+
+glm::mat4 projection;
 GLint projectionLoc;
+
+// needed for light computation
+glm::mat3 normalMatrix;
 GLint normalMatrixLoc;
+
+// needed for shadow computation
+glm::mat3 lightDirMatrix;
+GLuint lightDirMatrixLoc;
+
+// ####################
+//		LIGHT
+// ####################
+
+glm::vec3 lightDir;
 GLint lightDirLoc;
+
+glm::vec3 lightColor;
 GLint lightColorLoc;
 
-GLint lightCubeLoc;
+GLfloat lightAngle;
 
-// camera
-int cameraWidth, cameraHeight;
+GLuint shadowMapFBO;
+GLuint shadowMapTexture;
+const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+
+
+// spotlight
+int spotinit;
+float spotlight1;
+float spotlight2;
+
+glm::vec3 spotLightDirection;
+glm::vec3 spotLightPosition;
+
+
+// lumina punctiforma
+int pointinit = 0;
+glm::vec3 lightPos1; // pe sperietoare
+GLuint lightPos1Loc;
+glm::vec3 lightPos2; // pe casa + fan
+GLuint lightPos2Loc;
+
+
+
+// ####################
+//		MDELS
+// ####################
+
+GLfloat angle;
+gps::Model3D house;
+gps::Model3D fullScene;
+
+
+// ####################
+//		SHADERS
+// ####################
+
+gps::Shader mainShader;
+gps::Shader lightShader;
+gps::Shader depthMapShader;
+
+
+
+// ####################
+//		CAMERA
+// ####################
+
+glm::vec3 initialCameraPosition = glm::vec3(-0.1f, 0.21f, 3.55f);
+
 gps::Camera myCamera(
-	glm::vec3(0.0f, 0.0f, 3.0f),
+	initialCameraPosition,
 	glm::vec3(0.0f, 0.0f, -1.0f),
 	glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -55,22 +116,63 @@ float pitch = 0.0f, yaw = 0.0f;
 const float nearPlane = 0.1f, farPlane = 1000.0f;
 const float FOV = 45.0f;
 
-// models
-gps::Model3D teapot;
-gps::Model3D lightCube;
-GLfloat angle;
 
-// shaders
-gps::Shader myBasicShader;
-gps::Shader lightShader;
+// ####################
+//		CONTROLS
+// ####################
 
-// controls
+
+// keyboard
 GLboolean pressedKeys[1024];
 
+// mouse
 float lastX = screenWidth / 2.0f;
 float lastY = screenHeight / 2.0f;
 bool firstMouse = true;
 const float mouseSensitivity = 0.5f;
+
+// ####################
+//		EFFECTS
+// ####################
+
+// fog
+bool fogActive = false;
+int fogInit = 0;
+GLint fogInitLoc;
+GLfloat fogDensity = 0.005f;
+
+// for camera preview
+bool cameraPreview = false;
+float previewAngle = 0.0f;
+
+
+// ####################
+//		MAIN PROGRAM
+// ####################
+
+
+void preview() {
+	if (cameraPreview) {
+		previewAngle += 0.6f;
+		myCamera.preview(previewAngle);
+		std::cout << "Preview active" << std::endl;
+	}
+}
+
+void moveCameraToInitialPos() {
+	myCamera.setCameraPosition(initialCameraPosition);
+}
+
+glm::mat4 computeLightSpaceTrMatrix()
+{
+	const GLfloat near_plane = 0.1f, far_plane = 6.0f;
+	glm::mat4 lightProjection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, near_plane, far_plane);
+
+	glm::vec3 lightDirTr = glm::vec3(glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f)) * glm::vec4(lightDir, 1.0f));
+	glm::mat4 lightView = glm::lookAt(lightDirTr, myCamera.getCameraPosition() + myCamera.getCameraFrontDirection(), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	return lightProjection * lightView;
+}
 
 GLenum glCheckError_(const char* file, int line)
 {
@@ -115,13 +217,13 @@ void windowResizeCallback(GLFWwindow* window, int width, int height) {
 	myWindow.setWindowDimensions(windowDimensions);
 
 	// set the shader program
-	myBasicShader.useShaderProgram();
+	mainShader.useShaderProgram();
 
 	// update the projection
 	glm::mat4 projection = glm::perspective(glm::radians(45.0f),
 		(float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
 		nearPlane, farPlane);
-	GLint projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
+	GLint projectionLoc = glGetUniformLocation(mainShader.shaderProgram, "projection");
 	// send projection matrix to shader
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
@@ -171,7 +273,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 	myCamera.rotate(pitch, yaw);
 }
 
-void processMovement() {
+void processKeyboardInputs() {
 	if (pressedKeys[GLFW_KEY_W]) {
 		myCamera.move(gps::MOVE_FORWARD, cameraSpeed);
 	}
@@ -208,6 +310,50 @@ void processMovement() {
 		normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
 	}
 
+	if (pressedKeys[GLFW_KEY_F]) {
+		// TODO: implement fog
+		if (!fogActive) {
+			fogActive = true;
+			mainShader.useShaderProgram();
+			fogInit = 1;
+			fogInitLoc = glGetUniformLocation(mainShader.shaderProgram, "fogInit");
+			glUniform1i(fogInitLoc, fogInit);
+		}
+		else {
+			fogActive = false;
+			mainShader.useShaderProgram();
+			fogInit = 1;
+			fogInitLoc = glGetUniformLocation(mainShader.shaderProgram, "fogInit");
+			glUniform1i(fogInitLoc, fogInit);
+		}
+	}
+
+	// increase the intensity of fog
+	if (pressedKeys[GLFW_KEY_M])
+	{
+		fogDensity = glm::min(fogDensity + 0.0001f, 1.0f);
+	}
+
+	// decrease the intensity of fog
+	if (pressedKeys[GLFW_KEY_N])
+	{
+		fogDensity = glm::max(fogDensity - 0.0001f, 0.0f);
+	}
+
+	if (pressedKeys[GLFW_KEY_P]) {
+		// reset the preview angle if stopping preview
+		if (cameraPreview) {
+			previewAngle = 0.0f;
+			cameraPreview = false;
+			moveCameraToInitialPos();
+		}
+		else
+		{
+			cameraPreview = true;
+		}
+	}
+
+
 	if (pressedKeys[GLFW_KEY_LEFT_SHIFT]) {
 		myCamera.move(gps::MOVE_UP, cameraSpeed);
 	}
@@ -216,7 +362,9 @@ void processMovement() {
 		myCamera.move(gps::MOVE_DOWN, cameraSpeed);
 	}
 
-	// VIEWING MODE CONTROLS
+	// ########################
+	//		VIEW CONTROLS
+	// ########################
 
 	// line view
 	if (pressedKeys[GLFW_KEY_1]) {
@@ -232,6 +380,12 @@ void processMovement() {
 	if (pressedKeys[GLFW_KEY_3]) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
+
+	// TODO: Implement camera preview
+
+	// ########################
+	//		VIEW CONTROLS
+	// ########################
 }
 
 void initOpenGLWindow() {
@@ -255,87 +409,149 @@ void initOpenGLState() {
 	glFrontFace(GL_CCW); // GL_CCW for counter clock-wise
 }
 
+void initFBO() {
+	//generate FBO ID
+	glGenFramebuffers(1, &shadowMapFBO);
+
+	//create depth texture for FBO
+	glGenTextures(1, &shadowMapTexture);
+	glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+		SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	//attach texture to FBO
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMapTexture, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void initModels() {
-	teapot.LoadModel("models/teapot/teapot20segUT.obj");
-	lightCube.LoadModel("models/cube/cube.obj");
+	fullScene.LoadModel("objects/full_scene/scene.obj");
 }
 
 void initShaders() {
-	myBasicShader.loadShader("shaders/basic.vert", "shaders/basic.frag");
-	lightShader.loadShader("shaders/lightCube.vert", "shaders/lightCube.frag");
+	mainShader.loadShader("shaders/basic.vert", "shaders/basic.frag");
+	// lightShader.loadShader("shaders/light.vert", "shaders/light.frag");
+	depthMapShader.loadShader("shaders/depthMap.vert", "shaders/depthMap.frag");
 }
 
 void initUniforms() {
-	myBasicShader.useShaderProgram();
-	
-	// create model matrix for teapot
+	mainShader.useShaderProgram();
+
+	// create model matrix for model
 	model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
-	modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
+	modelLoc = glGetUniformLocation(mainShader.shaderProgram, "model");
 
 	// get view matrix for current camera
 	view = myCamera.getViewMatrix();
-	viewLoc = glGetUniformLocation(myBasicShader.shaderProgram, "view");
+	viewLoc = glGetUniformLocation(mainShader.shaderProgram, "view");
 	// send view matrix to shader
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-	// compute normal matrix for teapot
+	// compute normal matrix
 	normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
-	normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
+	normalMatrixLoc = glGetUniformLocation(mainShader.shaderProgram, "normalMatrix");
 
 	// create projection matrix
 	projection = glm::perspective(glm::radians(45.0f),
 		(float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
 		nearPlane, farPlane);
-	projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
+	projectionLoc = glGetUniformLocation(mainShader.shaderProgram, "projection");
 	// send projection matrix to shader
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	//set the light direction (direction towards the light)
 	lightDir = glm::vec3(0.0f, 1.0f, 1.0f);
-	lightDirLoc = glGetUniformLocation(myBasicShader.shaderProgram, "lightDir");
+	lightDirLoc = glGetUniformLocation(mainShader.shaderProgram, "lightDir");
 	// send light dir to shader
 	glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
 
 	//set light color
 	lightColor = glm::vec3(1.0f, 1.0f, 1.0f); //white light
-	lightColorLoc = glGetUniformLocation(myBasicShader.shaderProgram, "lightColor");
+	lightColorLoc = glGetUniformLocation(mainShader.shaderProgram, "lightColor");
 	// send light color to shader
 	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
 }
 
-void renderTeapot(gps::Shader shader) {
-	// select active shader program
+
+void renderFullScene(gps::Shader shader) {
+//	// select active shader program
 	shader.useShaderProgram();
 	//send teapot model matrix data to shader
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 	//send teapot normal matrix data to shader
 	glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 	// draw teapot
-	teapot.Draw(shader);
-}
-
-void renderLighCube(gps::Shader shader) {
-	// select the light shader
-	shader.useShaderProgram();
-	// send the model matrix to the vertex shader
-	// glUniformMatrix4fv(lightCubeLoc, 1, GL_FALSE, glm::value_ptr());
-
+	fullScene.Draw(shader);
 }
 
 void renderScene() {
+	
 	// clear the frame buffer and the depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// render the teapot
-	renderTeapot(myBasicShader);
+	// Depth buffer rendering
+	depthMapShader.useShaderProgram();
+
+	glUniformMatrix4fv(glGetUniformLocation(
+		depthMapShader.shaderProgram, "lightSpaceTrMatrix"),
+		1,
+		GL_FALSE,
+		glm::value_ptr(computeLightSpaceTrMatrix()));
+
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	renderFullScene(mainShader);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// 2nd step: render the scene
+
+	mainShader.useShaderProgram();
+
+	// send lightSpace matrix to shader
+	glUniformMatrix4fv(glGetUniformLocation(mainShader.shaderProgram, "lightSpaceTrMatrix"), 1, GL_FALSE, glm::value_ptr(computeLightSpaceTrMatrix()));
+
+	// send view matrix to shader
+	view = myCamera.getViewMatrix();
+
+	glUniformMatrix4fv(glGetUniformLocation(mainShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
+	// compute light direction transformation matrix
+	lightDirMatrix = glm::mat3(glm::inverseTranspose(view));
+	// send lightDir matrix data to shader
+	glUniformMatrix3fv(lightDirMatrixLoc, 1, GL_FALSE, glm::value_ptr(lightDirMatrix));
+
+	glViewport(0, 0, screenWidth, screenHeight);
+	mainShader.useShaderProgram();
+
+	// bind the depth map
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
+	glUniform1i(glGetUniformLocation(mainShader.shaderProgram, "shadowMap"), 3);
+
+
+	glUniform1f(glGetUniformLocation(mainShader.shaderProgram, "fogDensity"), fogDensity);
+
+	renderFullScene(mainShader);
+
+	// camera preview
+	preview();
 }
 
 void updateView() {
 	// update view matrix
 	view = myCamera.getViewMatrix();
-	myBasicShader.useShaderProgram();
+	mainShader.useShaderProgram();
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
 	// compute normal matrix for teapot
 	normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
 }
@@ -358,15 +574,19 @@ int main(int argc, const char* argv[]) {
 
 
 	initOpenGLState(); // initialize the GL 
+	initFBO(); // init the depthMap FBO
 	initModels(); // load the models
 	initShaders(); // load the shaders
 	initUniforms(); // initialize the uniforms
 	setWindowCallbacks();
+	moveCameraToInitialPos();
 
 	glCheckError();
 	// application loop
 	while (!glfwWindowShouldClose(myWindow.getWindow())) {
 		
+
+
 		// calculate the camera speed each frame, 
 		// relative to the previous one
 		currentFrame = glfwGetTime();
@@ -374,8 +594,22 @@ int main(int argc, const char* argv[]) {
 		lastFrame = currentFrame;
 		cameraSpeed = 4.0f * deltaTime;
 
+
+		std::cout 
+			<< "Camera position (x, y, z): " 
+			<< "("  << myCamera.getCameraPosition().x << ", " 
+			<< myCamera.getCameraPosition().y << ", "
+			<< myCamera.getCameraPosition().z << ")" << std::endl;
+
+		std::cout << "Camera target (x, y, z): "
+			<< "(" << myCamera.getCameraFrontDirection().x << ", "
+			<< myCamera.getCameraFrontDirection().x << ", "
+			<< myCamera.getCameraFrontDirection().x << ")" << std::endl;
+		
+		
+
+		processKeyboardInputs();
 		updateView();
-		processMovement();
 		renderScene();
 
 		glfwSwapBuffers(myWindow.getWindow()); // swap between front and back buffer

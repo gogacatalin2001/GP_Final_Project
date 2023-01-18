@@ -1,0 +1,13 @@
+# Blender 3.4.1 MTL File: 'low-poly-island-scene.blend'
+# www.blender.org
+
+newmtl Material.003
+Ns 82.573654
+Ka 1.000000 1.000000 1.000000
+Kd 0.342376 0.182121 0.001385
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd Wooden_Path_Texture.png
