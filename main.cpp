@@ -481,13 +481,14 @@ void initUniforms() {
 
 
 void renderFullScene(gps::Shader shader) {
-//	// select active shader program
+	// select active shader program
 	shader.useShaderProgram();
-	//send teapot model matrix data to shader
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-	//send teapot normal matrix data to shader
+	//send model matrix data to shader
+
+	glUniformMatrix4fv(glGetUniformLocation(shader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+	//send normal matrix data to shader
 	glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-	// draw teapot
+	// draw the scene
 	fullScene.Draw(shader);
 }
 
@@ -509,7 +510,7 @@ void renderScene() {
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	renderFullScene(mainShader);
+	renderFullScene(depthMapShader);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
